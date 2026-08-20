@@ -55,7 +55,9 @@ supabase db push
 
 `0001_init.sql` creates the schema, the closed error taxonomy as a Postgres
 enum, and row-level security on every table. `0002_audio_retention.sql` creates
-the private audio bucket and the 30-day purge.
+the private audio bucket and the 30-day purge. `0003_lock_down_functions.sql`
+revokes RPC access to the two `SECURITY DEFINER` functions, which PostgREST
+would otherwise expose at `/rest/v1/rpc/<name>`.
 
 Sign-in is a magic link, so enable email auth in the Supabase dashboard. The
 app is single-user, but every table is keyed to `auth.uid()` — opening it up
@@ -88,6 +90,39 @@ npm test         # unit tests
 npm run typecheck
 npm run build
 ```
+
+## Deploying
+
+Supabase first — Vercel needs its URL and key at build time.
+
+1. **Create the Supabase project**, then apply the three migrations in order
+   (SQL editor or `supabase db push`).
+2. **Authentication → Providers → Email**: enable it. Sign-in is a magic link,
+   so no password settings matter. Free-tier magic links go through shared SMTP
+   with a low hourly rate limit — fine for one user, not for a demo to a room.
+3. **Import the repo on Vercel.** Framework auto-detects as Next.js; leave the
+   build and output settings alone.
+4. **Set the environment variables before the first build.** `NEXT_PUBLIC_*` is
+   inlined into the client bundle at build time, so adding those after a deploy
+   leaves the browser holding `undefined` until you redeploy. The server-side
+   keys are read per request and take effect on save.
+5. **Point auth back at the deployed domain.** In Supabase, under
+   **Authentication → URL Configuration**, set the Site URL to the deployment
+   and add both `https://<domain>/**` and `http://localhost:3000/**` to Redirect
+   URLs. The login page sends `emailRedirectTo: window.location.origin + next`;
+   if the domain is not allow-listed the magic link bounces to the site root and
+   you appear signed out after clicking it. This is the step that bites.
+6. **Schedule the audio purge** (optional — voice mode only):
+
+   ```sql
+   create extension if not exists pg_cron;
+   select cron.schedule('purge-audio', '0 4 * * *', 'select purge_expired_audio()');
+   ```
+
+   Without it, recordings accumulate instead of expiring at 30 days. Nothing
+   else breaks.
+
+Then sign in, add expressions in the bank, and drill.
 
 ## Layout
 
