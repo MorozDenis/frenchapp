@@ -19,6 +19,8 @@ export const fail = (message: string, status = 400) =>
  * "the grader is down, your answer is saved" apart from "you sent nonsense" —
  * FR-5.2 turns on that distinction.
  */
+export class BadRequestError extends Error {}
+
 export function route<T>(
   handler: (ctx: { supabase: Db; user: User; request: Request }) => Promise<T>,
 ) {
@@ -34,6 +36,7 @@ export function route<T>(
       });
       return result instanceof NextResponse ? result : json(result);
     } catch (error) {
+      if (error instanceof BadRequestError) return fail(error.message, 400);
       if (error instanceof LlmUnavailableError) {
         return NextResponse.json(
           { error: error.message, code: "llm_unavailable" },
@@ -52,6 +55,6 @@ export async function body<T>(request: Request): Promise<T> {
   try {
     return (await request.json()) as T;
   } catch {
-    throw new Error("Request body must be JSON");
+    throw new BadRequestError("Request body must be JSON");
   }
 }

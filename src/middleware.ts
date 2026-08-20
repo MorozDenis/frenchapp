@@ -33,6 +33,11 @@ export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isPublic = path.startsWith("/login") || path.startsWith("/auth");
 
+  // API routes answer for themselves. Redirecting them would hand a `fetch`
+  // caller an HTML login page where it expects JSON, turning every expired
+  // session into an unreadable parse error.
+  if (path.startsWith("/api")) return response;
+
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";

@@ -76,7 +76,6 @@ export function nextReview(
   let state: ReviewStateName = prev.state;
   let lastFastSessionId = prev.lastFastSessionId;
   let lastFastPromptId = prev.lastFastPromptId;
-  let repeatInSession = false;
 
   // The expression was not used at all. It is not a memory failure so much as
   // a retrieval no-show — the item comes back before the user leaves.
@@ -161,7 +160,8 @@ export function nextReview(
     state,
     lastFastSessionId,
     lastFastPromptId,
-    repeatInSession,
+    // Only `absent` repeats within the session, and that returns above.
+    repeatInSession: false,
   };
 }
 

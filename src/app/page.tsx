@@ -87,6 +87,10 @@ export default function DrillPage() {
   useEffect(() => {
     try {
       const stored = localStorage.getItem(SETTINGS_KEY);
+      // Read after mount rather than in a lazy initialiser: localStorage does
+      // not exist when this page is prerendered, and seeding state from it
+      // during render would mismatch on hydration.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (stored) setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(stored) });
     } catch {
       // A corrupt settings blob is not worth a broken drill.
@@ -202,6 +206,8 @@ export default function DrillPage() {
 
   useEffect(() => {
     if (phase !== "starting" || queue.length === 0) return;
+    // The state update happens after an await, which the rule cannot see through.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadPrompt(queue[0]);
   }, [phase, queue, loadPrompt]);
 

@@ -30,6 +30,10 @@ export async function POST(
     return fail("That attempt is already scored", 409);
   }
 
-  const outcome = await gradeAttempt(supabase, id);
-  return NextResponse.json(outcome);
+  try {
+    const outcome = await gradeAttempt(supabase, id);
+    return NextResponse.json(outcome);
+  } catch (cause) {
+    return fail(cause instanceof Error ? cause.message : "Re-scoring failed", 500);
+  }
 }

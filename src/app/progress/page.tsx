@@ -43,6 +43,8 @@ export default function ProgressPage() {
   };
 
   useEffect(() => {
+    // The state update happens after an await, which the rule cannot see through.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, []);
 
