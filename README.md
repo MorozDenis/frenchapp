@@ -100,8 +100,12 @@ Supabase first — Vercel needs its URL and key at build time.
 2. **Authentication → Providers → Email**: enable it. Sign-in is a magic link,
    so no password settings matter. Free-tier magic links go through shared SMTP
    with a low hourly rate limit — fine for one user, not for a demo to a room.
-3. **Import the repo on Vercel.** Framework auto-detects as Next.js; leave the
-   build and output settings alone.
+3. **Import the repo on Vercel.** `vercel.json` pins the framework to
+   `nextjs`, so the build works even if the project was created before the app
+   existed — a project first linked to an empty repo detects "no framework" and
+   keeps that setting, then fails with `STATIC_BUILD_NO_OUT_DIR` looking for a
+   `public/` directory. Pinning it in the repo makes the build reproducible
+   rather than dependent on what the dashboard happened to infer.
 4. **Set the environment variables before the first build.** `NEXT_PUBLIC_*` is
    inlined into the client bundle at build time, so adding those after a deploy
    leaves the browser holding `undefined` until you redeploy. The server-side
