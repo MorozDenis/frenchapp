@@ -1,12 +1,17 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
+import { supabaseConfig } from "@/lib/config";
 import type { Database } from "@/lib/database.types";
 
-const url = () => {
-  const value = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!value) throw new Error("NEXT_PUBLIC_SUPABASE_URL is not configured");
-  return value;
+const requireConfig = () => {
+  const config = supabaseConfig();
+  if (!config) {
+    throw new Error(
+      "Supabase is not configured: set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY, then redeploy.",
+    );
+  }
+  return config;
 };
 
 /**
@@ -16,9 +21,10 @@ const url = () => {
  */
 export async function supabaseServer() {
   const cookieStore = await cookies();
+  const { url, anonKey } = requireConfig();
   return createServerClient<Database>(
-    url(),
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    url,
+    anonKey,
     {
       cookies: {
         getAll: () => cookieStore.getAll(),
@@ -45,7 +51,7 @@ export async function supabaseServer() {
 export function supabaseAdmin() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!key) throw new Error("SUPABASE_SERVICE_ROLE_KEY is not configured");
-  return createClient<Database>(url(), key, {
+  return createClient<Database>(requireConfig().url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }

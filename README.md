@@ -109,7 +109,9 @@ Supabase first — Vercel needs its URL and key at build time.
 4. **Set the environment variables before the first build.** `NEXT_PUBLIC_*` is
    inlined into the client bundle at build time, so adding those after a deploy
    leaves the browser holding `undefined` until you redeploy. The server-side
-   keys are read per request and take effect on save.
+   keys are read per request and take effect on save. A deployment missing
+   either public variable serves a 503 naming the ones it cannot find, on every
+   route, rather than failing obscurely.
 5. **Point auth back at the deployed domain.** In Supabase, under
    **Authentication → URL Configuration**, set the Site URL to the deployment
    and add both `https://<domain>/**` and `http://localhost:3000/**` to Redirect
