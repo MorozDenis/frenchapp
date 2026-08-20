@@ -1,1 +1,126 @@
-# frenchapp
+# Débit
+
+Timed French production drill for TCF/TEF candidates at the B1→B2 boundary.
+
+The problem it addresses is retrieval speed, not rule knowledge. Anki and
+Duolingo train recognition — seeing *néanmoins* and recalling "nevertheless".
+The exam requires production: generating a correct, register-appropriate
+sentence containing *néanmoins* in under fifteen seconds, unprompted. This app
+does timed, constrained production practice with automated correction, so reps
+per week are limited by available minutes rather than by tutor availability.
+
+## The loop
+
+A themed situation plus two to four target expressions → type or speak an
+answer against a clock → an LLM returns structured scores, a correction, and one
+key fix → each expression's review interval moves on **both** correctness and
+latency. The drill never asks you to leave it to fix data or read an
+explanation.
+
+The scheduling rule that makes this different from ordinary spaced repetition:
+**correct but slow is not a pass.** An answer you produced in 50 seconds is
+still passive vocabulary, so it buys no interval growth and costs ease.
+
+| Outcome | Interval effect |
+|---|---|
+| Correct + `rapide` (<20s) | interval × ease |
+| Correct + `correct` (20–45s) | interval × 1.3 |
+| Correct + `lent` (>45s) | unchanged, ease −0.1 |
+| Misused | reset to 1 day, ease −0.2 |
+| Absent | repeat in the same session |
+
+An expression reaches `active` after two fast-correct results in different
+sessions and in at least one different prompt context.
+
+## Running it
+
+Requires Node 20+, a Supabase project, and an Anthropic API key. Voice mode
+additionally needs a Whisper-compatible transcription endpoint.
+
+```bash
+npm install
+cp .env.example .env.local     # then fill it in
+npm run dev
+```
+
+### Database
+
+Apply the migrations in `supabase/migrations/` in order, either through the
+Supabase SQL editor or with the CLI:
+
+```bash
+supabase link --project-ref <ref>
+supabase db push
+```
+
+`0001_init.sql` creates the schema, the closed error taxonomy as a Postgres
+enum, and row-level security on every table. `0002_audio_retention.sql` creates
+the private audio bucket and the 30-day purge.
+
+Sign-in is a magic link, so enable email auth in the Supabase dashboard. The
+app is single-user, but every table is keyed to `auth.uid()` — opening it up
+later is a policy change, not a migration.
+
+To run the audio purge on a schedule:
+
+```sql
+select cron.schedule('purge-audio', '0 4 * * *', 'select purge_expired_audio()');
+```
+
+### Environment
+
+| Variable | Needed for |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | everything |
+| `ANTHROPIC_API_KEY` | enrichment, prompt generation, scoring |
+| `ANTHROPIC_MODEL` | optional; defaults to `claude-opus-5` |
+| `WHISPER_API_URL`, `WHISPER_API_KEY`, `WHISPER_MODEL` | voice mode |
+| `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_AUDIO_BUCKET` | keeping voice recordings for playback |
+
+Model keys are read only inside server routes and never reach the browser.
+Without `SUPABASE_SERVICE_ROLE_KEY` voice mode still works; it just cannot store
+the audio for reviewing a suspect transcription later.
+
+### Checks
+
+```bash
+npm test         # unit tests
+npm run typecheck
+npm run build
+```
+
+## Layout
+
+```
+src/lib/          scheduling, planning, parsing, scoring normalisation, analytics
+src/lib/llm/      Anthropic calls: enrichment, packs, prompts, grading
+src/app/api/      server routes; every model key lives here
+src/app/          drill (/), bank, cheat sheet, progress
+supabase/         migrations
+tests/            unit tests for everything pure
+```
+
+The rules worth knowing before changing anything:
+
+- **The error taxonomy is closed** (`src/lib/taxonomy.ts`). The trend charts
+  compare month against month, and one invented category puts a phantom bar on
+  the axis. The list is enforced as a Postgres enum and filtered again when the
+  model's response is parsed.
+- **Scoring never blocks.** The attempt row is written before the grader is
+  called, so a grader outage costs the correction, never the rep. Failed grades
+  queue for retry on the progress page.
+- **The rubric in `src/lib/llm/score.ts` is versioned by hand.** Editing it
+  changes what the numbers mean, so trend lines across an edit are not
+  like-for-like.
+- **The drill input has no spell-check, autocomplete or grammar underlining.**
+  Those are crutches the exam does not provide. The accent palette inserts
+  characters and nothing more.
+
+## Not in scope
+
+No grammar lessons. No streaks, XP, badges, leaderboards, or notifications as
+engagement. No social features. No mobile app — responsive web only. Full essay
+mode (a 35-minute *lettre à la rédaction* scored against the exam rubric rather
+than per expression) is a later phase and is not built.
+
+> The app has failed if it is being improved more often than it is being used.

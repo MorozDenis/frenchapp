@@ -213,18 +213,21 @@ create table state_snapshot (
   primary key (user_id, day)
 );
 
-create function snapshot_states(p_user_id uuid) returns void
+-- Takes no argument on purpose: a security-definer function that accepted a
+-- user id would let any authenticated caller write snapshot rows into someone
+-- else's history, which RLS on the table would otherwise have prevented.
+create function snapshot_states() returns void
 language sql security definer set search_path = public as $$
   insert into state_snapshot (user_id, day, new, learning, active)
   select
-    p_user_id,
+    auth.uid(),
     current_date,
     count(*) filter (where rs.state = 'new'),
     count(*) filter (where rs.state = 'learning'),
     count(*) filter (where rs.state = 'active')
   from review_state rs
   join expression e on e.id = rs.expression_id
-  where rs.user_id = p_user_id and e.archived_at is null
+  where rs.user_id = auth.uid() and e.archived_at is null
   on conflict (user_id, day) do update
     set new = excluded.new, learning = excluded.learning, active = excluded.active;
 $$;

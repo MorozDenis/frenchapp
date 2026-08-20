@@ -141,7 +141,7 @@ export type Database = {
     };
     Views: { [_ in never]: never };
     Functions: {
-      snapshot_states: { Args: { p_user_id: string }; Returns: undefined };
+      snapshot_states: { Args: Record<never, never>; Returns: undefined };
       purge_expired_audio: { Args: Record<never, never>; Returns: number };
     };
     Enums: { [_ in never]: never };

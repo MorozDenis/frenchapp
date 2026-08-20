@@ -530,6 +530,82 @@ a:hover {
   stroke-dasharray: 2 4;
 }
 
+/* Chart palette. Categorical slots 1-2 and a three-step ordinal blue ramp,
+   both validated against the card surface in each mode (dataviz six checks):
+   light on #ffffff, dark on #1c1e17. Text in charts always wears a text token,
+   never a series colour. */
+.viz-root {
+  --surface-1: var(--surface);
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --ordinal-1: #86b6ef;
+  --ordinal-2: #2a78d6;
+  --ordinal-3: #104281;
+}
+@media (prefers-color-scheme: dark) {
+  .viz-root {
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    /* Reversed for the dark surface: the step nearest the surface still has to
+       clear 2:1, so the ramp runs dark-to-light instead of light-to-dark. */
+    --ordinal-1: #184f95;
+    --ordinal-2: #3987e5;
+    --ordinal-3: #9ec5f4;
+  }
+}
+
+.viz-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  padding: 7px 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  box-shadow: var(--shadow);
+  white-space: nowrap;
+  z-index: 5;
+}
+.viz-tooltip__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.viz-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.viz-table th,
+.viz-table td {
+  text-align: right;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.viz-table th:first-child,
+.viz-table td:first-child {
+  text-align: left;
+}
+.viz-table th {
+  color: var(--text-3);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.hero {
+  font-size: 52px;
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  font-family: var(--sans);
+}
+
 .legend {
   display: flex;
   gap: 14px;

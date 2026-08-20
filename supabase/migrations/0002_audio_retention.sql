@@ -47,3 +47,7 @@ begin
   return purged;
 end;
 $$;
+
+-- Maintenance only. It bypasses RLS and is not scoped to a caller, so no
+-- end-user role may run it.
+revoke execute on function purge_expired_audio() from public, anon, authenticated;

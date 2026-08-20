@@ -44,7 +44,7 @@ export const POST = route(async ({ supabase, user, request }) => {
 
   // Cheap enough to do on session start, and it gives FR-8's state chart a
   // daily data point without a separate scheduled job.
-  await supabase.rpc("snapshot_states", { p_user_id: user.id });
+  await supabase.rpc("snapshot_states");
 
   const newShare = pool.totalActive ? pool.newCount / pool.totalActive : 0;
 
