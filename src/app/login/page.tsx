@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabase/client";
 
@@ -17,13 +17,35 @@ function LoginForm() {
 
   const next = params.get("next") ?? "/";
 
+  // Sign-in failures come back here two different ways: on the query string
+  // when Supabase redirects to our callback, and in the URL fragment when it
+  // falls back to the project's Site URL (which happens when the redirect
+  // target is not on the allow-list). The fragment never reaches the server,
+  // so it has to be read here.
+  useEffect(() => {
+    const fromQuery = params.get("error");
+    const fromFragment = new URLSearchParams(
+      window.location.hash.replace(/^#/, ""),
+    ).get("error_description");
+    const reported = fromQuery ?? fromFragment;
+    if (!reported) return;
+    // The fragment is only readable after mount, so this cannot move into
+    // render or a lazy initialiser.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setStatus("error");
+    setMessage(reported.replace(/\+/g, " "));
+  }, [params]);
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setStatus("sending");
     const { error } = await supabaseBrowser().auth.signInWithOtp({
       email: email.trim(),
       options: {
-        emailRedirectTo: `${window.location.origin}${next}`,
+        // Must land on the callback route, not on the destination page: the
+        // one-time code in the link is only useful to a server that can trade
+        // it for a session.
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
       },
     });
     if (error) {
