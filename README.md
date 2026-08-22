@@ -163,9 +163,12 @@ The rules worth knowing before changing anything:
   whatever the environment points at; run it after any provider, model or
   prompt change.
 - **Latency is a deployment constraint, not just a comfort one.** Measured on
-  Kimi, the same scoring call has taken anywhere from 22s to 74s. Hosted
+  Kimi, the same scoring call has taken anywhere from 22s to 74s, and the same
+  four-expression enrichment took 32s on one run and 65s on the next. Hosted
   functions are capped (60s on Vercel Hobby, 300s on Pro), and the tail
-  exceeds the lower cap. FR-5.2 is what makes that survivable: the attempt is
+  exceeds the lower cap. Batch sizes here are therefore set for the tail
+  rather than the median, and a paste is enriched two expressions at a time —
+  which looks absurdly small until you see the variance. FR-5.2 is what makes that survivable: the attempt is
   written before the grader runs, so a timeout costs the correction and not
   the rep, and the progress page re-scores from the queue.
 - **The drill input has no spell-check, autocomplete or grammar underlining.**

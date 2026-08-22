@@ -48,6 +48,7 @@ export default function BankPage() {
   const [draft, setDraft] = useState<Draft>(null);
   const [duplicates, setDuplicates] = useState<{ text: string; archived: boolean }[]>([]);
   const [busy, setBusy] = useState<null | "parse" | "pack" | "save" | "more">(null);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,6 +63,92 @@ export default function BankPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
+
+  /**
+   * Parse first, then enrich in batches.
+   *
+   * Parsing is free and handles the whole paste at once; enrichment costs
+   * seconds per expression and has to be chopped into requests that each fit
+   * a hosted function. Results append to the review list as they land, so a
+   * long paste shows progress instead of appearing to hang.
+   */
+  const ENRICH_BATCH = 2;
+  const ENRICH_CONCURRENCY = 4;
+
+  const parseAndEnrich = async (rawText: string) => {
+    setBusy("parse");
+    setError(null);
+    setMessage(null);
+    setProgress(null);
+    try {
+      const response = await fetch("/api/expressions/parse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ raw: rawText }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        setError(result.error ?? "Could not read that paste");
+        return;
+      }
+
+      setDuplicates(result.duplicates ?? []);
+      const pending: { text: string; userGloss: string | null }[] = result.candidates;
+      if (pending.length === 0) {
+        setMessage("Nothing new in that paste — it is all in the bank already.");
+        return;
+      }
+
+      const batches: (typeof pending)[] = [];
+      for (let i = 0; i < pending.length; i += ENRICH_BATCH) {
+        batches.push(pending.slice(i, i + ENRICH_BATCH));
+      }
+
+      setDraft({ items: [], source: "user" });
+      setProgress({ done: 0, total: pending.length });
+
+      let cursor = 0;
+      let failed = 0;
+      const runBatch = async (batch: (typeof pending)[number][]) => {
+        try {
+          const r = await fetch("/api/expressions/enrich", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ items: batch }),
+          });
+          const payload = await r.json();
+          if (!r.ok) throw new Error(payload.error ?? "enrichment failed");
+          const enriched = (payload.items as Omit<Candidate, "accepted">[]).map(toCandidate);
+          // Append as each batch lands so the list fills in visibly.
+          setDraft((prev) => (prev ? { ...prev, items: [...prev.items, ...enriched] } : prev));
+        } catch {
+          // One bad batch must not lose the rest of the paste.
+          failed += batch.length;
+        } finally {
+          cursor += batch.length;
+          setProgress({ done: cursor, total: pending.length });
+        }
+      };
+
+      // A small worker pool: enough concurrency to be worth it, not enough to
+      // stampede the model provider.
+      const queue = [...batches];
+      await Promise.all(
+        Array.from({ length: Math.min(ENRICH_CONCURRENCY, queue.length) }, async () => {
+          for (let next = queue.shift(); next; next = queue.shift()) await runBatch(next);
+        }),
+      );
+
+      setProgress(null);
+      if (failed > 0) {
+        setError(
+          `${failed} of ${pending.length} could not be enriched and were skipped. Everything else is below.`,
+        );
+      }
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const call = async (
     kind: "parse" | "pack",
@@ -201,6 +288,13 @@ export default function BankPage() {
         </p>
       )}
 
+      {progress && (
+        <p className="notice" style={{ marginBottom: 16 }}>
+          Enriching {progress.done} of {progress.total}… you can start reviewing the
+          ones already below.
+        </p>
+      )}
+
       {error && <p className="notice notice--error" style={{ marginBottom: 16 }}>{error}</p>}
       {message && <p className="notice notice--ok" style={{ marginBottom: 16 }}>{message}</p>}
 
@@ -210,7 +304,8 @@ export default function BankPage() {
             <h2 style={{ fontSize: 17 }}>Paste a list</h2>
             <p className="tiny muted" style={{ margin: 0 }}>
               One per line, or comma-separated. Translations after a dash or in
-              brackets are picked up as hints.
+              brackets are picked up as hints. Paste as many as you like — they
+              are enriched a few at a time.
             </p>
             <textarea
               className="textarea"
@@ -223,7 +318,7 @@ export default function BankPage() {
               type="button"
               className="btn btn--primary"
               disabled={busy !== null || !raw.trim()}
-              onClick={() => void call("parse", "/api/expressions/parse", { raw }, "user")}
+              onClick={() => void parseAndEnrich(raw)}
             >
               {busy === "parse" ? "Enriching…" : "Parse and enrich"}
             </button>

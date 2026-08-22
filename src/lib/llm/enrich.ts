@@ -34,7 +34,7 @@ Rules:
  * carrying twenty of them takes twenty times as long and dies with the
  * function. Batches run concurrently and each stays small enough to return.
  */
-const ENRICH_BATCH_SIZE = 5;
+const ENRICH_BATCH_SIZE = 2;
 
 export async function enrichExpressions(
   candidates: { text: string; userGloss: string | null }[],

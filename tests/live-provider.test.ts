@@ -19,11 +19,19 @@ import { ERROR_CATEGORIES, EXPRESSION_TYPES } from "@/lib/taxonomy";
 const live = process.env.LLM_API_KEY ? describe : describe.skip;
 
 live("live provider", () => {
-  it("enriches expressions (FR-1.1)", { timeout: 120_000 }, async () => {
-    const items = await enrichExpressions([
-      { text: "néanmoins", userGloss: "nevertheless" },
-      { text: "prendre une décision", userGloss: null },
-    ]);
+  it("enriches a full batch (FR-1.1)", { timeout: 180_000 }, async () => {
+    // The size /api/expressions/enrich accepts in one request. If this does not
+    // finish inside a hosted function, the batch ceiling is set too high.
+    const input = ["néanmoins", "prendre une décision"].map((text) => ({
+      text,
+      userGloss: null,
+    }));
+
+    const started = Date.now();
+    const items = await enrichExpressions(input);
+    const elapsed = Date.now() - started;
+    console.log(`  enriched ${items.length} in ${(elapsed / 1000).toFixed(1)}s`);
+
     expect(items).toHaveLength(2);
     for (const item of items) {
       expect(EXPRESSION_TYPES).toContain(item.type);

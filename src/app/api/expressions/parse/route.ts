@@ -1,27 +1,17 @@
 import { body, fail, route } from "@/lib/api";
-import { enrichExpressions } from "@/lib/llm/enrich";
 import { normalizeForDedupe, parseRawList } from "@/lib/parse-list";
 
 /**
- * These routes wait on a language model. The platform default cuts a function
- * off long before one returns, and a killed function loses the attempt — so the
- * ceiling is raised to the maximum the plan allows.
- */
-export const maxDuration = 60;
-
-
-/**
- * FR-1.1 — parse a raw paste, deduplicate against the bank, enrich the rest.
+ * FR-1.1, first half — parse a raw paste and deduplicate it against the bank.
  *
- * Duplicates are reported rather than silently dropped: pasting a list you
- * already own and being told "nothing new" is information, and an archived
- * match is a prompt to restore rather than to create a second history.
+ * No model is called here, so this is fast and the paste can be as long as the
+ * user likes. Enrichment is the expensive half and lives in its own route,
+ * because one request carrying seventy expressions cannot finish inside a
+ * hosted function while one carrying eight comfortably can.
  */
 
-// Each expression costs real seconds of model time, and the whole request has
-// to return inside the function's limit. Bigger pastes are split by the user
-// rather than silently truncated.
-const MAX_PER_PASTE = 10;
+/** Purely a sanity bound on request size; nothing here is per-item expensive. */
+const MAX_PER_PASTE = 300;
 
 export const POST = route(async ({ supabase, request }) => {
   const { raw } = await body<{ raw?: string }>(request);
@@ -30,9 +20,7 @@ export const POST = route(async ({ supabase, request }) => {
   const parsed = parseRawList(raw);
   if (parsed.length === 0) return fail("No expressions found in that paste");
   if (parsed.length > MAX_PER_PASTE) {
-    return fail(
-      `That paste has ${parsed.length} expressions. Add at most ${MAX_PER_PASTE} at a time — enrichment takes a few seconds each, and a bank that outruns your drilling is the failure mode here anyway.`,
-    );
+    return fail(`That paste has ${parsed.length} expressions. Split it up.`);
   }
 
   const { data: existing, error } = await supabase
@@ -45,7 +33,7 @@ export const POST = route(async ({ supabase, request }) => {
   );
 
   const duplicates: { text: string; id: string; archived: boolean }[] = [];
-  const fresh: typeof parsed = [];
+  const candidates: { text: string; userGloss: string | null }[] = [];
 
   for (const candidate of parsed) {
     const match = byKey.get(normalizeForDedupe(candidate.text));
@@ -56,11 +44,9 @@ export const POST = route(async ({ supabase, request }) => {
         archived: match.archived_at !== null,
       });
     } else {
-      fresh.push(candidate);
+      candidates.push(candidate);
     }
   }
 
-  const items = await enrichExpressions(fresh);
-
-  return { items, duplicates, parsedCount: parsed.length };
+  return { candidates, duplicates, parsedCount: parsed.length };
 });
