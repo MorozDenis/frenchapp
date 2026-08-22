@@ -7,16 +7,32 @@ import Anthropic from "@anthropic-ai/sdk";
  * browser. Nothing in this file may be imported from a client component.
  */
 
-export const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-opus-5";
+export const MODEL = process.env.LLM_MODEL ?? process.env.ANTHROPIC_MODEL ?? "claude-opus-5";
+
+/**
+ * Base URL for the grading model.
+ *
+ * Left unset this talks to Anthropic. Set it to any Anthropic-compatible
+ * gateway (several providers expose one so that Claude Code can point at them)
+ * and the rest of this file is unchanged — the wire format is what matters,
+ * not who serves it.
+ */
+const BASE_URL = process.env.LLM_BASE_URL;
+const API_KEY = process.env.LLM_API_KEY ?? process.env.ANTHROPIC_API_KEY;
 
 let cached: Anthropic | null = null;
 
 export function anthropic(): Anthropic {
   if (!cached) {
-    if (!process.env.ANTHROPIC_API_KEY) {
-      throw new LlmUnavailableError("ANTHROPIC_API_KEY is not configured");
+    if (!API_KEY) {
+      throw new LlmUnavailableError(
+        "No grading model configured: set LLM_API_KEY (or ANTHROPIC_API_KEY).",
+      );
     }
-    cached = new Anthropic();
+    cached = new Anthropic({
+      apiKey: API_KEY,
+      ...(BASE_URL ? { baseURL: BASE_URL } : {}),
+    });
   }
   return cached;
 }
