@@ -49,8 +49,32 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL(next, url.origin));
   }
 
-  return backToLogin(
-    url.origin,
-    "That sign-in link carried no token. Request a new one.",
-  );
+  // Nothing on the query string. Supabase reports verification failures in the
+  // URL *fragment*, which is never sent to a server — so the only way to learn
+  // the real reason is to hand the browser a page that reads it and reports
+  // back. Without this, an expired link is misreported as a malformed one.
+  return new NextResponse(FRAGMENT_FORWARDER, {
+    status: 200,
+    headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
+  });
 }
+
+/**
+ * Reads `#error_description` and forwards it to /login as a query parameter.
+ * The fragment is only ever passed through `URLSearchParams` and assigned to
+ * `location`, never written into the DOM, so its contents cannot become markup.
+ */
+const FRAGMENT_FORWARDER = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Signing in…</title></head>
+<body><script>
+(function () {
+  var hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  var reason =
+    hash.get("error_description") ||
+    hash.get("error") ||
+    "That sign-in link carried no token. Request a new one.";
+  var target = new URL("/login", window.location.origin);
+  target.searchParams.set("error", reason);
+  window.location.replace(target.toString());
+})();
+</script></body></html>`;
