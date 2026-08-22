@@ -47,7 +47,7 @@ export default function BankPage() {
   const [theme, setTheme] = useState<Theme>(THEMES[0]);
   const [draft, setDraft] = useState<Draft>(null);
   const [duplicates, setDuplicates] = useState<{ text: string; archived: boolean }[]>([]);
-  const [busy, setBusy] = useState<null | "parse" | "pack" | "save">(null);
+  const [busy, setBusy] = useState<null | "parse" | "pack" | "save" | "more">(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -88,6 +88,45 @@ export default function BankPage() {
       if (result.items.length === 0) {
         setMessage("Nothing new came back — it is all in the bank already.");
       }
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /**
+   * FR-1.3 asks for 15-25 candidates, but one request cannot generate that
+   * many before the function times out. Topping up reaches the same place:
+   * already-drafted items are sent as exclusions so the model does not repeat
+   * itself, and anything that slips through is filtered on arrival.
+   */
+  const generateMore = async () => {
+    if (!draft) return;
+    setBusy("more");
+    setError(null);
+    try {
+      const response = await fetch("/api/expressions/pack", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          theme,
+          count: 3,
+          exclude: draft.items.map((i) => i.text),
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        setError(result.error ?? "Could not generate more");
+        return;
+      }
+      const known = new Set(draft.items.map((i) => i.text.trim().toLowerCase()));
+      const added = (result.items as Omit<Candidate, "accepted">[])
+        .filter((i) => !known.has(i.text.trim().toLowerCase()))
+        .map(toCandidate);
+      if (added.length === 0) {
+        setMessage("Nothing new came back for that theme.");
+        return;
+      }
+      setDraft({ ...draft, items: [...draft.items, ...added] });
     } finally {
       setBusy(null);
     }
@@ -193,8 +232,8 @@ export default function BankPage() {
           <section className="card stack">
             <h2 style={{ fontSize: 17 }}>Generate a pack</h2>
             <p className="tiny muted" style={{ margin: 0 }}>
-              15–25 candidates for one TCF theme, filtered against what you already
-              own. Accept or discard each one.
+              Candidates for one TCF theme, filtered against what you already own.
+              Accept or discard each one, and top the batch up with “Generate more”.
             </p>
             <select
               className="select"
@@ -212,7 +251,7 @@ export default function BankPage() {
               className="btn"
               disabled={busy !== null}
               onClick={() =>
-                void call("pack", "/api/expressions/pack", { theme, count: 20 }, "generated")
+                void call("pack", "/api/expressions/pack", { theme, count: 3 }, "generated")
               }
             >
               {busy === "pack" ? "Generating…" : "Generate"}
@@ -228,6 +267,16 @@ export default function BankPage() {
               Review — {draft.items.filter((i) => i.accepted).length} of {draft.items.length} kept
             </h2>
             <span className="topbar__spacer" />
+            {draft.source === "generated" && (
+              <button
+                type="button"
+                className="btn"
+                onClick={() => void generateMore()}
+                disabled={busy !== null}
+              >
+                {busy === "more" ? "Generating…" : "Generate more"}
+              </button>
+            )}
             <button type="button" className="btn btn--ghost" onClick={() => setDraft(null)}>
               Discard
             </button>

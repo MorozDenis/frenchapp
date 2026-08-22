@@ -74,8 +74,9 @@ select cron.schedule('purge-audio', '0 4 * * *', 'select purge_expired_audio()')
 | Variable | Needed for |
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | everything |
-| `ANTHROPIC_API_KEY` | enrichment, prompt generation, scoring |
-| `ANTHROPIC_MODEL` | optional; defaults to `claude-opus-5` |
+| `LLM_API_KEY` | enrichment, prompt generation, scoring |
+| `LLM_BASE_URL` | optional; any Anthropic-compatible endpoint. Unset = Anthropic |
+| `LLM_MODEL` | optional; defaults to `claude-opus-5` |
 | `WHISPER_API_URL`, `WHISPER_API_KEY`, `WHISPER_MODEL` | voice mode |
 | `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_AUDIO_BUCKET` | keeping voice recordings for playback |
 
@@ -153,6 +154,20 @@ The rules worth knowing before changing anything:
 - **The rubric in `src/lib/llm/score.ts` is versioned by hand.** Editing it
   changes what the numbers mean, so trend lines across an edit are not
   like-for-like.
+- **The grading model is swappable but not interchangeable.** Any
+  Anthropic-compatible endpoint works via `LLM_BASE_URL`, but only Anthropic
+  enforces the response schema server-side. Elsewhere the closed enums hold
+  only as far as the model's care does — with reasoning disabled, Kimi returns
+  `register` values outside the allowed set and the whole response is
+  rejected. `tests/live-provider.test.ts` exercises all four calls against
+  whatever the environment points at; run it after any provider, model or
+  prompt change.
+- **Latency is a deployment constraint, not just a comfort one.** Measured on
+  Kimi, the same scoring call has taken anywhere from 22s to 74s. Hosted
+  functions are capped (60s on Vercel Hobby, 300s on Pro), and the tail
+  exceeds the lower cap. FR-5.2 is what makes that survivable: the attempt is
+  written before the grader runs, so a timeout costs the correction and not
+  the rep, and the progress page re-scores from the queue.
 - **The drill input has no spell-check, autocomplete or grammar underlining.**
   Those are crutches the exam does not provide. The accent palette inserts
   characters and nothing more.

@@ -4,6 +4,14 @@ import { requireUser, supabaseAdmin } from "@/lib/supabase/server";
 import { transcribeFrench, TranscriptionError } from "@/lib/whisper";
 
 /**
+ * These routes wait on a language model. The platform default cuts a function
+ * off long before one returns, and a killed function loses the attempt — so the
+ * ceiling is raised to the maximum the plan allows.
+ */
+export const maxDuration = 60;
+
+
+/**
  * FR-4.2 — audio in, French transcript out.
  *
  * A failure here returns 503 with `code: "transcription_failed"` so the drill

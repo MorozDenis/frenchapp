@@ -5,6 +5,14 @@ import { requireUser } from "@/lib/supabase/server";
 import type { Db } from "@/lib/api";
 
 /**
+ * These routes wait on a language model. The platform default cuts a function
+ * off long before one returns, and a killed function loses the attempt — so the
+ * ceiling is raised to the maximum the plan allows.
+ */
+export const maxDuration = 60;
+
+
+/**
  * FR-5.2 — drains the retry queue. Re-grading an attempt that already scored
  * is refused: the schedule has already moved on that result, and applying a
  * second grade would double-count the rep.

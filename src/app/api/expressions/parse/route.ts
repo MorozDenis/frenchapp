@@ -3,6 +3,14 @@ import { enrichExpressions } from "@/lib/llm/enrich";
 import { normalizeForDedupe, parseRawList } from "@/lib/parse-list";
 
 /**
+ * These routes wait on a language model. The platform default cuts a function
+ * off long before one returns, and a killed function loses the attempt — so the
+ * ceiling is raised to the maximum the plan allows.
+ */
+export const maxDuration = 60;
+
+
+/**
  * FR-1.1 — parse a raw paste, deduplicate against the bank, enrich the rest.
  *
  * Duplicates are reported rather than silently dropped: pasting a list you
@@ -10,7 +18,10 @@ import { normalizeForDedupe, parseRawList } from "@/lib/parse-list";
  * match is a prompt to restore rather than to create a second history.
  */
 
-const MAX_PER_PASTE = 60;
+// Each expression costs real seconds of model time, and the whole request has
+// to return inside the function's limit. Bigger pastes are split by the user
+// rather than silently truncated.
+const MAX_PER_PASTE = 10;
 
 export const POST = route(async ({ supabase, request }) => {
   const { raw } = await body<{ raw?: string }>(request);
@@ -20,7 +31,7 @@ export const POST = route(async ({ supabase, request }) => {
   if (parsed.length === 0) return fail("No expressions found in that paste");
   if (parsed.length > MAX_PER_PASTE) {
     return fail(
-      `That paste has ${parsed.length} expressions. Add at most ${MAX_PER_PASTE} at a time — the bank outrunning the drilling is the failure mode here.`,
+      `That paste has ${parsed.length} expressions. Add at most ${MAX_PER_PASTE} at a time — enrichment takes a few seconds each, and a bank that outruns your drilling is the failure mode here anyway.`,
     );
   }
 

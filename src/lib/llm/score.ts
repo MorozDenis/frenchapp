@@ -48,7 +48,8 @@ corrected_text:
 - Rewrite the learner's text so it is correct and idiomatic. Keep their argument, their examples, and roughly their length. Do not add content they did not write, and do not insert target expressions they left out.
 
 key_fix:
-- One sentence. The single change that would most improve the answer. Not a grammar lesson, not a list, not encouragement.`;
+- One sentence, written in English, quoting the French it refers to. The learner reads this under time pressure and dismisses it with one key, so it must be understood at a glance.
+- The single change that would most improve the answer. Not a grammar lesson, not a list, not encouragement.`;
 
 const TEXT_MODE_NOTE = `The learner typed this under time pressure with spell-check disabled. hesitation_count is 0.`;
 

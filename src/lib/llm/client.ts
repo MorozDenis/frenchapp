@@ -53,6 +53,24 @@ export class LlmUnavailableError extends Error {
 export type Effort = "low" | "medium" | "high";
 
 /**
+ * Whether the model reasons before answering.
+ *
+ * On by default, and measurably load-bearing rather than a nicety: with
+ * thinking disabled, Kimi returns values outside the closed enums — `register`
+ * came back as something other than formal/neutral/informal — and the schema
+ * rejects the whole response. Unlike Anthropic, these gateways validate
+ * nothing server-side, so the enum holds only as far as the model's care does.
+ *
+ * The latency this costs is paid back by batching large jobs instead, which
+ * keeps each request inside the function's time limit. LLM_THINKING=disabled
+ * is available for a fast, sloppier provider, but expect parse failures.
+ */
+const THINKING =
+  process.env.LLM_THINKING === "disabled"
+    ? ({ type: "disabled" } as const)
+    : ({ type: "adaptive" } as const);
+
+/**
  * Runs a structured-output call and returns the parsed object.
  *
  * FR-5.2 and FR-1.1 both want a single retry on a malformed response rather
@@ -77,6 +95,7 @@ export async function parseJson<T>(params: {
         max_tokens: params.maxTokens ?? 16000,
         system: params.system,
         messages: [{ role: "user", content: params.user }],
+        thinking: THINKING,
         output_config: {
           effort: params.effort ?? "medium",
           // eslint-disable-next-line @typescript-eslint/no-explicit-any

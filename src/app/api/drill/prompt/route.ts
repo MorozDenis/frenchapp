@@ -3,6 +3,14 @@ import { generatePrompt } from "@/lib/llm/prompt";
 import { TASK_TYPES, type TaskType } from "@/lib/taxonomy";
 
 /**
+ * These routes wait on a language model. The platform default cuts a function
+ * off long before one returns, and a killed function loses the attempt — so the
+ * ceiling is raised to the maximum the plan allows.
+ */
+export const maxDuration = 60;
+
+
+/**
  * FR-2 — the prompt for one drill item.
  *
  * FR-2.4 wants repeat exposure to a set to vary its wording, so prompts are
